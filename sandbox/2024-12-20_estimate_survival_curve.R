@@ -1,4 +1,6 @@
 
+source("sandbox/create_fig_theme.R")
+
 player <- data.table::fread("data/player.csv")
 
 pitcher_season_summary <- data.table::fread("data/pitcher_season_summary.csv") |>
@@ -45,8 +47,10 @@ ucl_injury <- ucl_injury_secret |>
     )
   )
 
+previous_year_pitches <- pitcher_season_summary |>
+  dplyr::transmute(year = year + 1, player_id, previous_pitches = pitches)
+
 data <- pitcher_season_summary |>
-  dplyr::full_join(ucl_injury, by = c("year", "player_id"), suffix = c("_pss", "_injury")) |>
   dplyr::left_join(player, by = "player_id") |>   # for position
   # Get most recent role if current role is NA
   dplyr::arrange(year) |>
@@ -55,12 +59,18 @@ data <- pitcher_season_summary |>
   dplyr::ungroup() |>
   dplyr::filter(
     is.na(position) | position == "P",
-    is.na(level_injury) | level_injury %in% c("Major", "Minor"),
     (batters_faced >= 27)    # NOTE: Minimum 27 BF to count in denominator
   ) |>
+  dplyr::full_join(ucl_injury, by = c("year", "player_id"), suffix = c("_pss", "_injury")) |>
+  dplyr::left_join(previous_injury, by = c("year", "player_id")) |>
+  dplyr::filter(
+    is.na(level_injury) | level_injury %in% c("Major", "Minor"),
+    year > 2008
+  ) |>
+  dplyr::mutate(batters_faced = dplyr::coalesce(batters_faced, 0)) |>
   dplyr::transmute(
     year, player_id, name_full, batters_faced, role, date_surgery,
-    level = ifelse(level_pss == "MLB", "Majors", "Minors")
+    level = ifelse(level_pss == "MLB", "Majors", "Minors"), previous_pitches
   )
 
 data |>
@@ -70,3 +80,61 @@ data |>
   ggplot2::ggplot(ggplot2::aes(x = year, y = injury_rate, fill = level)) +
   ggplot2::geom_col(position = "dodge")
 
+{
+  pdf("fig/survival_curve_by_role.pdf")
+  plot <- ggsurvfit::survfit2(
+    formula = survival::Surv(time = batters_faced, event = !is.na(date_surgery)) ~ role,
+    data = data
+  ) |>
+    ggsurvfit::ggsurvfit() +
+    ggsurvfit::add_confidence_interval() +
+    ggplot2::scale_color_manual(values = c(color_blue, color_orange)) +
+    ggplot2::scale_fill_manual(values = c(color_blue, color_orange)) +
+    theme_sleek()
+  print(plot)
+  dev.off()
+}
+
+{
+  pdf("fig/temp.pdf")
+  plot <- ggsurvfit::survfit2(
+    survival::coxph(
+      formula = survival::Surv(time = batters_faced, event = !is.na(date_surgery)) ~ role + previous_pitches,
+      data = data
+    )
+  ) |>
+    ggsurvfit::ggsurvfit() +
+    ggsurvfit::add_confidence_interval()
+  print(plot)
+  dev.off()
+}
+
+{
+  pdf("fig/survival_curve_by_level.pdf")
+  plot <- ggsurvfit::survfit2(
+    formula = survival::Surv(time = batters_faced, event = !is.na(date_surgery)) ~ level,
+    data = data
+  ) |>
+    ggsurvfit::ggsurvfit() +
+    ggsurvfit::add_confidence_interval() +
+    ggplot2::scale_color_manual(values = c(color_blue, color_orange)) +
+    ggplot2::scale_fill_manual(values = c(color_blue, color_orange)) +
+    theme_sleek()
+  print(plot)
+  dev.off()
+}
+
+{
+  pdf("fig/survival_curve_by_year.pdf")
+  plot <- ggsurvfit::survfit2(
+    formula = survival::Surv(time = batters_faced, event = !is.na(date_surgery)) ~ level,
+    data = data
+  ) |>
+    ggsurvfit::ggsurvfit() +
+    ggsurvfit::add_confidence_interval() +
+    ggplot2::scale_color_manual(values = c(color_blue, color_orange)) +
+    ggplot2::scale_fill_manual(values = c(color_blue, color_orange)) +
+    theme_sleek()
+  print(plot)
+  dev.off()
+}

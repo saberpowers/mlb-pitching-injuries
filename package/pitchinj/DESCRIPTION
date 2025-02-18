@@ -1,0 +1,11 @@
+Package: pitchinj
+Title: Helper functions for MLB pitching injury research
+Version: 0.0.0.9000
+Authors@R: 
+    person("Scott", "Powers", , "saberpowers@gmail.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0009-0001-7425-5941"))
+Description: For now, this is just a repo-specific set of helper functions.
+License: GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
